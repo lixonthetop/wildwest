@@ -1,5 +1,5 @@
 -- Lixhub for Roblox Wild West
--- Version: 1.0
+-- Version: 1.1 Beta
 -- Auteur: Lix
 
 -- Services
@@ -8,123 +8,156 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
 
 -- Player
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- Variables
-local AimbotEnabled = false
-local EspEnabled = false
-local AnimalEspEnabled = false
-local OreEspEnabled = false
-local FullbrightEnabled = false
-local InfiniteStaminaEnabled = false
-
-local AimbotKey = Enum.KeyCode.Q
-local MenuKey = Enum.KeyCode.RightControl
+-- Configuration des options (ce sont ces variables qui contrôlent les features)
+local Settings = {
+    Aimbot = false,
+    AimbotKey = Enum.KeyCode.Q,
+    EspPlayers = false,
+    EspAnimals = false,
+    EspOres = false,
+    Fullbright = false,
+    InfiniteStamina = false,
+    MenuKey = Enum.KeyCode.RightControl -- Touche pour ouvrir/fermer le menu
+}
 
 local CurrentTarget = nil
 local EspObjects = {}
 
--- Fonction pour créer l'interface
+-- === INTERFACE GRAPHIQUE (GUI) ===
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "LixhubGUI"
-ScreenGui.Parent = game:GetService("CoreGui") -- Pour que ça reste même si le script est rechargé
+ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.IgnoreGuiInset = true
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
-MainFrame.Size = UDim2.new(0, 400, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -200)
+MainFrame.Size = UDim2.new(0, 420, 0, 450)
 MainFrame.Visible = false
+MainFrame.Active = true
+MainFrame.Draggable = true -- Permet de déplacer la fenêtre
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.CornerRadius = UDim.new(0, 12)
 UICorner.Parent = MainFrame
 
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
 Title.Parent = MainFrame
-Title.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 Title.BackgroundTransparency = 1.000
 Title.Position = UDim2.new(0, 0, 0, 10)
-Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Size = UDim2.new(1, 0, 0, 35)
 Title.Font = Enum.Font.GothamBold
 Title.Text = "Lixhub - Wild West"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 20.000
+Title.TextSize = 22.000
 
--- Fonction pour créer un bouton toggle
-local function createToggle(text, yPos, configVar)
+-- Fonction pour créer un bouton toggle (ON/OFF)
+local function createToggle(text, yPos, settingName)
     local ToggleButton = Instance.new("TextButton")
     ToggleButton.Parent = MainFrame
-    ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    ToggleButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     ToggleButton.BorderSizePixel = 0
     ToggleButton.Position = UDim2.new(0, 20, 0, yPos)
-    ToggleButton.Size = UDim2.new(0, 150, 0, 30)
+    ToggleButton.Size = UDim2.new(0, 380, 0, 40)
     ToggleButton.Font = Enum.Font.Gotham
-    ToggleButton.Text = text .. ": OFF"
-    ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleButton.TextSize = 14.000
+    ToggleButton.Text = text
+    ToggleButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    ToggleButton.TextSize = 16.000
+    ToggleButton.TextXAlignment = Enum.TextXAlignment.Left
     
+    -- Padding pour le texte
+    local TextPadding = Instance.new("UIPadding")
+    TextPadding.PaddingLeft = UDim.new(0, 15)
+    TextPadding.Parent = ToggleButton
+
     local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 5)
+    UICorner.CornerRadius = UDim.new(0, 8)
     UICorner.Parent = ToggleButton
 
+    -- Indicateur ON/OFF
+    local Indicator = Instance.new("Frame")
+    Indicator.Name = "Indicator"
+    Indicator.Parent = ToggleButton
+    Indicator.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    Indicator.BorderSizePixel = 0
+    Indicator.Position = UDim2.new(1, -50, 0.5, -10)
+    Indicator.Size = UDim2.new(0, 30, 0, 20)
+    
+    local IndicatorCorner = Instance.new("UICorner")
+    IndicatorCorner.CornerRadius = UDim.new(0, 10)
+    IndicatorCorner.Parent = Indicator
+
+    -- Fonction pour mettre à jour l'état du bouton
+    local function updateButton()
+        if Settings[settingName] then
+            TweenService:Create(Indicator, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 255, 50)}):Play()
+        else
+            TweenService:Create(Indicator, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 50, 50)}):Play()
+        end
+    end
+
+    -- Logique du clic
     ToggleButton.MouseButton1Click:Connect(function()
-        configVar.value = not configVar.value
-        ToggleButton.Text = text .. ": " .. (configVar.value and "ON" or "OFF")
-        ToggleButton.BackgroundColor3 = configVar.value and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+        Settings[settingName] = not Settings[settingName]
+        updateButton()
     end)
+
+    updateButton() -- Mettre à jour l'état initial
 end
 
--- Création des boutons
-createToggle("Aimbot (Q)", 60, { value = AimbotEnabled })
-createToggle("ESP Players", 100, { value = EspEnabled })
-createToggle("ESP Animals", 140, { value = AnimalEspEnabled })
-createToggle("ESP Ores", 180, { value = OreEspEnabled })
-createToggle("Fullbright", 220, { value = FullbrightEnabled })
-createToggle("Infinite Stamina", 260, { value = InfiniteStaminaEnabled })
+-- Création de tous les boutons dans le menu
+createToggle("Aimbot (Appuyer sur Q pour viser)", 60, "Aimbot")
+createToggle("ESP Joueurs", 110, "EspPlayers")
+createToggle("ESP Animaux", 160, "EspAnimals")
+createToggle("ESP Minerais", 210, "EspOres")
+createToggle("Fullbright", 260, "Fullbright")
+createToggle("Stamina Infinie (Cheval)", 310, "InfiniteStamina")
 
--- Mettre à jour les variables depuis les boutons
-local function updateConfigVars()
-    AimbotEnabled = MainFrame:FindFirstChild("Aimbot (Q): OFF") and MainFrame:FindFirstChild("Aimbot (Q): OFF").Text == "Aimbot (Q): ON" or false
-    EspEnabled = MainFrame:FindFirstChild("ESP Players: OFF") and MainFrame:FindFirstChild("ESP Players: OFF").Text == "ESP Players: ON" or false
-    AnimalEspEnabled = MainFrame:FindFirstChild("ESP Animals: OFF") and MainFrame:FindFirstChild("ESP Animals: OFF").Text == "ESP Animals: ON" or false
-    OreEspEnabled = MainFrame:FindFirstChild("ESP Ores: OFF") and MainFrame:FindFirstChild("ESP Ores: OFF").Text == "ESP Ores: ON" or false
-    FullbrightEnabled = MainFrame:FindFirstChild("Fullbright: OFF") and MainFrame:FindFirstChild("Fullbright: OFF").Text == "Fullbright: ON" or false
-    InfiniteStaminaEnabled = MainFrame:FindFirstChild("Infinite Stamina: OFF") and MainFrame:FindFirstChild("Infinite Stamina: OFF").Text == "Infinite Stamina: ON" or false
-end
+
+-- === LOGIQUE DES FONCTIONNALITÉS ===
 
 -- Fonction pour obtenir le HumanoidRootPart
 local function getRootPart(character)
     return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
 end
 
--- Fonction pour vérifier la visibilité
+-- Fonction pour vérifier la visibilité (si la cible n'est pas derrière un mur)
 local function isVisible(target)
     local origin = Camera.CFrame.Position
     local direction = (target.Position - origin).Unit
     local ray = Ray.new(origin, direction * (target.Position - origin).Magnitude)
-    local hit, position = Workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, Camera})
+    local hit = Workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, Camera})
     return hit == nil or hit:IsDescendantOf(target.Parent)
 end
 
--- Boucle principale
-RunService.RenderStepped:Connect(function()
-    updateConfigVars()
+-- Boucle principale qui s'exécute à chaque image
+RunService.Heartbeat:Connect(function()
+    -- Nettoyer les anciens objets ESP
+    for _, obj in pairs(EspObjects) do
+        if obj and obj.Parent then
+            obj:Destroy()
+        end
+    end
+    EspObjects = {}
 
-    -- Aimbot
-    if AimbotEnabled and UserInputService:IsKeyDown(AimbotKey) then
+    -- --- AIMBOT ---
+    if Settings.Aimbot and UserInputService:IsKeyDown(Settings.AimbotKey) then
         local closestPlayer = nil
         local shortestDistance = math.huge
 
         for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and getRootPart(player.Character) then
+            if player ~= LocalPlayer and player.Character and getRootPart(player.Character) and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
                 local rootPart = getRootPart(player.Character)
                 local distance = (Camera.CFrame.Position - rootPart.Position).Magnitude
                 if distance < shortestDistance and isVisible(rootPart) then
@@ -139,30 +172,29 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Nettoyer les anciens ESP
-    for _, obj in pairs(EspObjects) do
-        if obj and obj.Parent then
-            obj:Destroy()
-        end
-    end
-    EspObjects = {}
-
-    -- ESP Joueurs
-    if EspEnabled then
+    -- --- ESP JOUEURS ---
+    if Settings.EspPlayers then
         for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and getRootPart(player.Character) then
+            if player ~= LocalPlayer and player.Character and getRootPart(player.Character) and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
                 local rootPart = getRootPart(player.Character)
                 local pos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
                 
                 if onScreen then
-                    local box = Instance.new("Frame")
-                    box.Size = UDim2.new(0, 4, 0, 4)
-                    box.Position = UDim2.new(0, pos.X, 0, pos.Y)
-                    box.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-                    box.BorderSizePixel = 0
-                    box.Parent = ScreenGui
+                    local box = Drawing.new("Square")
+                    box.Size = Vector2.new(2000 / pos.Z, 2500 / pos.Z)
+                    box.Position = Vector2.new(pos.X - box.Size.X / 2, pos.Y - box.Size.Y / 2)
+                    box.Color = Color3.fromRGB(255, 0, 0)
+                    box.Thickness = 2
+                    box.Transparency = 1
+                    box.Visible = true
                     table.insert(EspObjects, box)
                 end
             end
         end
     end
+
+    -- --- ESP ANIMAUX ---
+    if Settings.EspAnimals then
+        for _, animal in pairs(Workspace.WORKSPACE_Interactables.Animals:GetChildren()) do
+            if animal:FindFirstChild("HumanoidRootPart") then
+                local rootPart
