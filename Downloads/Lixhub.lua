@@ -1,200 +1,193 @@
--- Lixhub for Roblox Wild West
--- Version: 1.1 Beta
--- Auteur: Lix
-
--- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local StarterGui = game:GetService("StarterGui")
 
--- Player
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- Configuration des options (ce sont ces variables qui contrôlent les features)
+-- ===================================
+-- Tableau des Paramètres (Settings)
+-- C'est ici que toutes les options sont stockées.
+-- ===================================
 local Settings = {
-    Aimbot = false,
-    AimbotKey = Enum.KeyCode.Q,
-    EspPlayers = false,
-    EspAnimals = false,
-    EspOres = false,
-    Fullbright = false,
-    InfiniteStamina = false,
-    MenuKey = Enum.KeyCode.RightControl -- Touche pour ouvrir/fermer le menu
+    AimbotEnabled = false,
+    AimbotKey = Enum.UserInputType.MouseButton2, -- Clic droit pour viser
+    AimStrength = 0.15, -- Puissance de l'aimbot (0.1 = lent, 1 = instantané)
+    VisibleCheck = true, -- Vérifie si la cible est visible (pas derrière un mur)
+
+    -- Options ESP (Extra Sensory Perception)
+    EspBox = false, -- Boîte autour des joueurs
+    EspName = false, -- Nom des joueurs
+    EspDistance = false, -- Distance des joueurs
+    EspHighlight = false, -- Surligne les joueurs
+    AnimalEsp = false, -- ESP pour les animaux
+    LegendaryAnimalEsp = false, -- ESP pour les animaux légendaires
+    OreEsp = false, -- ESP pour les minerais
+
+    BoxColor = Color3.fromRGB(255, 0, 0), -- Couleur des boîtes ESP
+
+    -- Autres options
+    Fullbright = false, -- Rend le jeu entièrement lumineux
+    HorseStamina = false, -- Stamina infinie pour le cheval
+    HitboxExtendAnimal = false, -- Agrandit la hitbox des animaux
+
+    -- Interface
+    MenuKey = Enum.KeyCode.Insert, -- Touche pour ouvrir/fermer le menu
+    FovSize = 150, -- Taille du FOV (Field of View) pour l'aimbot
+    Transparency = 0.5, -- Transparence du menu
 }
 
-local CurrentTarget = nil
-local EspObjects = {}
+-- ===================================
+-- Cache des objets (pour optimiser les performances)
+-- ===================================
+local PlayerCache = {}
+local AnimalCache = {}
+local LegendaryAnimalCache = {}
+local OreCache = {}
+local HitboxCache = {}
 
--- === INTERFACE GRAPHIQUE (GUI) ===
+-- ===================================
+-- Interface Graphique (GUI)
+-- ===================================
+-- Crée le ScreenGui principal
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "LixhubGUI"
 ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
 
+-- Crée la fenêtre principale du menu
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.5, -200, 0.5, -200)
-MainFrame.Size = UDim2.new(0, 420, 0, 450)
-MainFrame.Visible = false
+MainFrame.Position = UDim2.new(0.5, -375, 0.5, -240)
+MainFrame.Size = UDim2.new(0, 750, 0, 500)
+MainFrame.Visible = true
 MainFrame.Active = true
-MainFrame.Draggable = true -- Permet de déplacer la fenêtre
+MainFrame.Draggable = true
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)
-UICorner.Parent = MainFrame
+-- Arrondit les coins de la fenêtre
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 6)
+MainCorner.Parent = MainFrame
 
+-- Crée la barre latérale
+local Sidebar = Instance.new("Frame")
+Sidebar.Name = "Sidebar"
+Sidebar.Size = UDim2.new(0, 180, 1, 0)
+Sidebar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Sidebar.Parent = MainFrame
+local SidebarCorner = Instance.new("UICorner")
+SidebarCorner.CornerRadius = UDim.new(0, 6)
+SidebarCorner.Parent = Sidebar
+
+-- Titre du menu
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
-Title.Parent = MainFrame
-Title.BackgroundTransparency = 1.000
-Title.Position = UDim2.new(0, 0, 0, 10)
-Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Size = UDim2.new(1, -20, 0, 50)
+Title.Position = UDim2.new(0, 10, 0, 10)
+Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "Lixhub - Wild West"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 22.000
+Title.Text = "Lixhub"
+Title.TextColor3 = Color3.fromRGB(255, 85, 0)
+Title.TextSize = 28
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Sidebar
 
--- Fonction pour créer un bouton toggle (ON/OFF)
-local function createToggle(text, yPos, settingName)
-    local ToggleButton = Instance.new("TextButton")
-    ToggleButton.Parent = MainFrame
-    ToggleButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    ToggleButton.BorderSizePixel = 0
-    ToggleButton.Position = UDim2.new(0, 20, 0, yPos)
-    ToggleButton.Size = UDim2.new(0, 380, 0, 40)
-    ToggleButton.Font = Enum.Font.Gotham
-    ToggleButton.Text = text
-    ToggleButton.TextColor3 = Color3.fromRGB(200, 200, 200)
-    ToggleButton.TextSize = 16.000
-    ToggleButton.TextXAlignment = Enum.TextXAlignment.Left
-    
-    -- Padding pour le texte
-    local TextPadding = Instance.new("UIPadding")
-    TextPadding.PaddingLeft = UDim.new(0, 15)
-    TextPadding.Parent = ToggleButton
+-- Conteneur pour les boutons de navigation
+local NavigationLayout = Instance.new("UIListLayout")
+NavigationLayout.Padding = UDim.new(0, 5)
+NavigationLayout.SortOrder = Enum.SortOrder.LayoutOrder
+NavigationLayout.Parent = Sidebar
 
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 8)
-    UICorner.Parent = ToggleButton
+-- Conteneur pour les pages de contenu
+local PagesContainer = Instance.new("Frame")
+PagesContainer.Name = "PagesContainer"
+PagesContainer.Size = UDim2.new(1, -190, 1, -20)
+PagesContainer.Position = UDim2.new(0, 190, 0, 10)
+PagesContainer.BackgroundTransparency = 1
+PagesContainer.Parent = MainFrame
 
-    -- Indicateur ON/OFF
-    local Indicator = Instance.new("Frame")
-    Indicator.Name = "Indicator"
-    Indicator.Parent = ToggleButton
-    Indicator.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    Indicator.BorderSizePixel = 0
-    Indicator.Position = UDim2.new(1, -50, 0.5, -10)
-    Indicator.Size = UDim2.new(0, 30, 0, 20)
-    
-    local IndicatorCorner = Instance.new("UICorner")
-    IndicatorCorner.CornerRadius = UDim.new(0, 10)
-    IndicatorCorner.Parent = Indicator
+-- Tableau pour stocker les pages et les boutons
+local Pages = {}
+local NavigationButtons = {}
 
-    -- Fonction pour mettre à jour l'état du bouton
-    local function updateButton()
-        if Settings[settingName] then
-            TweenService:Create(Indicator, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 255, 50)}):Play()
-        else
-            TweenService:Create(Indicator, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 50, 50)}):Play()
-        end
-    end
+-- Fonction pour créer une page de contenu
+local function createPage(pageName)
+    local page = Instance.new("ScrollingFrame")
+    page.Name = pageName
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.Visible = false
+    page.ScrollBarThickness = 8
+    page.Parent = PagesContainer
 
-    -- Logique du clic
-    ToggleButton.MouseButton1Click:Connect(function()
-        Settings[settingName] = not Settings[settingName]
-        updateButton()
-    end)
+    local pageLayout = Instance.new("UIListLayout")
+    pageLayout.Padding = UDim.new(0, 8)
+    pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    pageLayout.Parent = page
 
-    updateButton() -- Mettre à jour l'état initial
+    return page
 end
 
--- Création de tous les boutons dans le menu
-createToggle("Aimbot (Appuyer sur Q pour viser)", 60, "Aimbot")
-createToggle("ESP Joueurs", 110, "EspPlayers")
-createToggle("ESP Animaux", 160, "EspAnimals")
-createToggle("ESP Minerais", 210, "EspOres")
-createToggle("Fullbright", 260, "Fullbright")
-createToggle("Stamina Infinie (Cheval)", 310, "InfiniteStamina")
+-- Fonction pour créer un bouton de navigation
+local function createNavigationButton(text, icon, layoutOrder)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -20, 0, 40)
+    button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    button.BorderSizePixel = 0
+    button.Font = Enum.Font.Gotham
+    button.Text = "  " .. icon .. "  " .. text
+    button.TextColor3 = Color3.fromRGB(200, 200, 200)
+    button.TextSize = 16
+    button.TextXAlignment = Enum.TextXAlignment.Left
+    button.LayoutOrder = layoutOrder
+    button.Parent = Sidebar
 
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 4)
+    buttonCorner.Parent = button
 
--- === LOGIQUE DES FONCTIONNALITÉS ===
-
--- Fonction pour obtenir le HumanoidRootPart
-local function getRootPart(character)
-    return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+    return button
 end
 
--- Fonction pour vérifier la visibilité (si la cible n'est pas derrière un mur)
-local function isVisible(target)
-    local origin = Camera.CFrame.Position
-    local direction = (target.Position - origin).Unit
-    local ray = Ray.new(origin, direction * (target.Position - origin).Magnitude)
-    local hit = Workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, Camera})
-    return hit == nil or hit:IsDescendantOf(target.Parent)
+-- Fonction pour basculer entre les pages
+local function switchToPage(pageToShow)
+    for _, page in pairs(Pages) do
+        page.Visible = false
+    end
+    for _, button in pairs(NavigationButtons) do
+        button.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+    pageToShow.Visible = true
 end
 
--- Boucle principale qui s'exécute à chaque image
-RunService.Heartbeat:Connect(function()
-    -- Nettoyer les anciens objets ESP
-    for _, obj in pairs(EspObjects) do
-        if obj and obj.Parent then
-            obj:Destroy()
-        end
-    end
-    EspObjects = {}
+-- Création des pages et des boutons
+do
+    -- Page Combat
+    local combatPage = createPage("Combat")
+    local combatButton = createNavigationButton("Combat", "⚔️", 1)
+    combatButton.MouseButton1Click:Connect(function() switchToPage(combatPage) end)
+    Pages["Combat"] = combatPage
+    NavigationButtons["Combat"] = combatButton
 
-    -- --- AIMBOT ---
-    if Settings.Aimbot and UserInputService:IsKeyDown(Settings.AimbotKey) then
-        local closestPlayer = nil
-        local shortestDistance = math.huge
+    -- Page Visuals
+    local visualsPage = createPage("Visuals")
+    local visualsButton = createNavigationButton("Visuels", "👁️", 2)
+    visualsButton.MouseButton1Click:Connect(function() switchToPage(visualsPage) end)
+    Pages["Visuals"] = visualsPage
+    NavigationButtons["Visuals"] = visualsButton
 
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and getRootPart(player.Character) and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-                local rootPart = getRootPart(player.Character)
-                local distance = (Camera.CFrame.Position - rootPart.Position).Magnitude
-                if distance < shortestDistance and isVisible(rootPart) then
-                    shortestDistance = distance
-                    closestPlayer = rootPart
-                end
-            end
-        end
-
-        if closestPlayer then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestPlayer.Position)
-        end
-    end
-
-    -- --- ESP JOUEURS ---
-    if Settings.EspPlayers then
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and getRootPart(player.Character) and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-                local rootPart = getRootPart(player.Character)
-                local pos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
-                
-                if onScreen then
-                    local box = Drawing.new("Square")
-                    box.Size = Vector2.new(2000 / pos.Z, 2500 / pos.Z)
-                    box.Position = Vector2.new(pos.X - box.Size.X / 2, pos.Y - box.Size.Y / 2)
-                    box.Color = Color3.fromRGB(255, 0, 0)
-                    box.Thickness = 2
-                    box.Transparency = 1
-                    box.Visible = true
-                    table.insert(EspObjects, box)
-                end
-            end
-        end
-    end
-
-    -- --- ESP ANIMAUX ---
-    if Settings.EspAnimals then
-        for _, animal in pairs(Workspace.WORKSPACE_Interactables.Animals:GetChildren()) do
-            if animal:FindFirstChild("HumanoidRootPart") then
-                local rootPart
+    -- Page World
+    local worldPage = createPage("World")
+    local worldButton = createNavigationButton("Monde", "🌍", 3)
+    worldButton.MouseButton1Click:Connect(function() switchToPage(worldPage) end)
+    Pages["World"] = world
