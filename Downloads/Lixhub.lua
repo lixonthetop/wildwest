@@ -1,126 +1,120 @@
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
-local StarterGui = game:GetService("StarterGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- Player
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
+local Camera = workspace.CurrentCamera
+
+-- Feature state (Variables globales pour activer/désactiver)
+local silentAimActive = false
+local espActive = false
+local espList = {}
 
 -- ===================================
--- Tableau des Paramètres (Settings)
--- C'est ici que toutes les options sont stockées.
+-- INTERFACE GRAPHIQUE (GUI)
 -- ===================================
-local Settings = {
-    AimbotEnabled = false,
-    AimbotKey = Enum.UserInputType.MouseButton2, -- Clic droit pour viser
-    AimStrength = 0.15, -- Puissance de l'aimbot (0.1 = lent, 1 = instantané)
-    VisibleCheck = true, -- Vérifie si la cible est visible (pas derrière un mur)
-
-    -- Options ESP (Extra Sensory Perception)
-    EspBox = false, -- Boîte autour des joueurs
-    EspName = false, -- Nom des joueurs
-    EspDistance = false, -- Distance des joueurs
-    EspHighlight = false, -- Surligne les joueurs
-    AnimalEsp = false, -- ESP pour les animaux
-    LegendaryAnimalEsp = false, -- ESP pour les animaux légendaires
-    OreEsp = false, -- ESP pour les minerais
-
-    BoxColor = Color3.fromRGB(255, 0, 0), -- Couleur des boîtes ESP
-
-    -- Autres options
-    Fullbright = false, -- Rend le jeu entièrement lumineux
-    HorseStamina = false, -- Stamina infinie pour le cheval
-    HitboxExtendAnimal = false, -- Agrandit la hitbox des animaux
-
-    -- Interface
-    MenuKey = Enum.KeyCode.Insert, -- Touche pour ouvrir/fermer le menu
-    FovSize = 150, -- Taille du FOV (Field of View) pour l'aimbot
-    Transparency = 0.5, -- Transparence du menu
-}
-
--- ===================================
--- Cache des objets (pour optimiser les performances)
--- ===================================
-local PlayerCache = {}
-local AnimalCache = {}
-local LegendaryAnimalCache = {}
-local OreCache = {}
-local HitboxCache = {}
-
--- ===================================
--- Interface Graphique (GUI)
--- ===================================
--- Crée le ScreenGui principal
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "LixhubGUI"
+ScreenGui.Name = "Lixhub"
 ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
 
--- Crée la fenêtre principale du menu
+-- Main Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.5, -375, 0.5, -240)
-MainFrame.Size = UDim2.new(0, 750, 0, 500)
-MainFrame.Visible = true
+MainFrame.Position = UDim2.new(0.5, -300, 0.5, -250)
+MainFrame.Size = UDim2.new(0, 600, 0, 500)
+MainFrame.Visible = false
 MainFrame.Active = true
 MainFrame.Draggable = true
 
--- Arrondit les coins de la fenêtre
 local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 6)
+MainCorner.CornerRadius = UDim.new(0, 12)
 MainCorner.Parent = MainFrame
 
--- Crée la barre latérale
-local Sidebar = Instance.new("Frame")
-Sidebar.Name = "Sidebar"
-Sidebar.Size = UDim2.new(0, 180, 1, 0)
-Sidebar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-Sidebar.Parent = MainFrame
-local SidebarCorner = Instance.new("UICorner")
-SidebarCorner.CornerRadius = UDim.new(0, 6)
-SidebarCorner.Parent = Sidebar
+-- Top Bar
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Parent = MainFrame
+TopBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TopBar.BorderSizePixel = 0
+TopBar.Size = UDim2.new(1, 0, 0, 40)
+TopBar.Position = UDim2.new(0, 0, 0, 0)
 
--- Titre du menu
+local TopCorner = Instance.new("UICorner")
+TopCorner.CornerRadius = UDim.new(0, 12)
+TopCorner.Parent = TopBar
+
+-- Title
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
-Title.Size = UDim2.new(1, -20, 0, 50)
-Title.Position = UDim2.new(0, 10, 0, 10)
+Title.Parent = TopBar
 Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.Size = UDim2.new(0, 100, 1, 0)
 Title.Font = Enum.Font.GothamBold
 Title.Text = "Lixhub"
 Title.TextColor3 = Color3.fromRGB(255, 85, 0)
-Title.TextSize = 28
+Title.TextSize = 20.000
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = Sidebar
 
--- Conteneur pour les boutons de navigation
-local NavigationLayout = Instance.new("UIListLayout")
-NavigationLayout.Padding = UDim.new(0, 5)
-NavigationLayout.SortOrder = Enum.SortOrder.LayoutOrder
-NavigationLayout.Parent = Sidebar
+-- Close Button
+local CloseButton = Instance.new("TextButton")
+CloseButton.Name = "CloseButton"
+CloseButton.Parent = TopBar
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+CloseButton.BorderSizePixel = 0
+CloseButton.Position = UDim2.new(1, -45, 0.5, -12)
+CloseButton.Size = UDim2.new(0, 35, 0, 25)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 14.000
 
--- Conteneur pour les pages de contenu
-local PagesContainer = Instance.new("Frame")
-PagesContainer.Name = "PagesContainer"
-PagesContainer.Size = UDim2.new(1, -190, 1, -20)
-PagesContainer.Position = UDim2.new(0, 190, 0, 10)
-PagesContainer.BackgroundTransparency = 1
-PagesContainer.Parent = MainFrame
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseButton
 
--- Tableau pour stocker les pages et les boutons
-local Pages = {}
-local NavigationButtons = {}
+-- Tab Buttons
+local TabButtons = Instance.new("Frame")
+TabButtons.Name = "TabButtons"
+TabButtons.Parent = MainFrame
+TabButtons.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TabButtons.BorderSizePixel = 0
+TabButtons.Position = UDim2.new(0, 0, 0, 40)
+TabButtons.Size = UDim2.new(0, 150, 1, -40)
 
--- Fonction pour créer une page de contenu
+local TabCorner = Instance.new("UICorner")
+TabCorner.CornerRadius = UDim.new(0, 12)
+TabCorner.Parent = TabButtons
+
+local TabListLayout = Instance.new("UIListLayout")
+TabListLayout.Padding = UDim.new(0, 5)
+TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabListLayout.Parent = TabButtons
+
+-- Pages
+local Pages = Instance.new("Frame")
+Pages.Name = "Pages"
+Pages.Parent = MainFrame
+Pages.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Pages.BorderSizePixel = 0
+Pages.Position = UDim2.new(0, 160, 0, 50)
+Pages.Size = UDim2.new(1, -170, 1, -60)
+
+local PagesCorner = Instance.new("UICorner")
+PagesCorner.CornerRadius = UDim.new(0, 8)
+PagesCorner.Parent = Pages
+
+-- Page Creation
 local function createPage(pageName)
     local page = Instance.new("ScrollingFrame")
     page.Name = pageName
@@ -128,66 +122,266 @@ local function createPage(pageName)
     page.BackgroundTransparency = 1
     page.Visible = false
     page.ScrollBarThickness = 8
-    page.Parent = PagesContainer
+    page.Parent = Pages
 
     local pageLayout = Instance.new("UIListLayout")
-    pageLayout.Padding = UDim.new(0, 8)
+    pageLayout.Padding = UDim.new(0, 10)
     pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
     pageLayout.Parent = page
+    pageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(0, 0, 0, pageLayout.AbsoluteContentSize.Y + 20)
+    end)
 
     return page
 end
 
--- Fonction pour créer un bouton de navigation
-local function createNavigationButton(text, icon, layoutOrder)
+-- Tab Button Creation
+local function createTabButton(text, page, layoutOrder)
     local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -20, 0, 40)
-    button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    button.Size = UDim2.new(1, -10, 0, 35)
+    button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     button.BorderSizePixel = 0
     button.Font = Enum.Font.Gotham
-    button.Text = "  " .. icon .. "  " .. text
+    button.Text = text
     button.TextColor3 = Color3.fromRGB(200, 200, 200)
-    button.TextSize = 16
-    button.TextXAlignment = Enum.TextXAlignment.Left
+    button.TextSize = 16.000
     button.LayoutOrder = layoutOrder
-    button.Parent = Sidebar
+    button.Parent = TabButtons
 
     local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, 4)
+    buttonCorner.CornerRadius = UDim.new(0, 6)
     buttonCorner.Parent = button
+
+    button.MouseButton1Click:Connect(function()
+        for _, p in pairs(Pages:GetChildren()) do
+            if p:IsA("ScrollingFrame") then
+                p.Visible = false
+            end
+        end
+        for _, b in pairs(TabButtons:GetChildren()) do
+            if b:IsA("TextButton") then
+                b.TextColor3 = Color3.fromRGB(200, 200, 200)
+                b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+            end
+        end
+        page.Visible = true
+        button.TextColor3 = Color3.fromRGB(255, 85, 0)
+        button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    end)
 
     return button
 end
 
--- Fonction pour basculer entre les pages
-local function switchToPage(pageToShow)
-    for _, page in pairs(Pages) do
-        page.Visible = false
-    end
-    for _, button in pairs(NavigationButtons) do
-        button.TextColor3 = Color3.fromRGB(200, 200, 200)
-    end
-    pageToShow.Visible = true
+-- Toggle Creation
+local function createToggle(text, yPos, stateVariable, page)
+    local ToggleFrame = Instance.new("Frame")
+    ToggleFrame.Name = "ToggleFrame"
+    ToggleFrame.Parent = page
+    ToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    ToggleFrame.BorderSizePixel = 0
+    ToggleFrame.Position = UDim2.new(0, 10, 0, yPos)
+    ToggleFrame.Size = UDim2.new(1, -20, 0, 30)
+    ToggleFrame.LayoutOrder = yPos
+
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(0, 6)
+    ToggleCorner.Parent = ToggleFrame
+
+    local ToggleLabel = Instance.new("TextLabel")
+    ToggleLabel.Name = "ToggleLabel"
+    ToggleLabel.Parent = ToggleFrame
+    ToggleLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleLabel.BackgroundTransparency = 1.000
+    ToggleLabel.Position = UDim2.new(0, 40, 0, 0)
+    ToggleLabel.Size = UDim2.new(1, -50, 1, 0)
+    ToggleLabel.Font = Enum.Font.Gotham
+    ToggleLabel.Text = text
+    ToggleLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    ToggleLabel.TextSize = 14.000
+    ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local ToggleButton = Instance.new("TextButton")
+    ToggleButton.Name = "ToggleButton"
+    ToggleButton.Parent = ToggleFrame
+    ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    ToggleButton.BorderSizePixel = 0
+    ToggleButton.Position = UDim2.new(0, 10, 0.5, -8)
+    ToggleButton.Size = UDim2.new(0, 25, 0, 16)
+    ToggleButton.Font = Enum.Font.SourceSans
+    ToggleButton.Text = ""
+    ToggleButton.TextColor3 = Color3
+    -- ToggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+    ToggleButton.TextSize = 14.000
+
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 8)
+    ButtonCorner.Parent = ToggleButton
+
+    -- Logic
+    local toggled = false
+    ToggleButton.MouseButton1Click:Connect(function()
+        toggled = not toggled
+        stateVariable[1] = toggled -- Met à jour la variable globale
+        TweenService:Create(ToggleButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {BackgroundColor3 = toggled and Color3.fromRGB(50, 255, 50) or Color3.fromRGB(255, 50, 50)}):Play()
+    end)
 end
 
--- Création des pages et des boutons
-do
-    -- Page Combat
-    local combatPage = createPage("Combat")
-    local combatButton = createNavigationButton("Combat", "⚔️", 1)
-    combatButton.MouseButton1Click:Connect(function() switchToPage(combatPage) end)
-    Pages["Combat"] = combatPage
-    NavigationButtons["Combat"] = combatButton
+-- ===================================
+-- CRÉATION DES PAGES ET DES BOUTONS
+-- ===================================
+-- Page Combat
+local combatPage = createPage("Combat")
+createTabButton("Combat", combatPage, 1)
+-- Toggle Silent Aim
+createToggle("Silent Aim", 10, {silentAimActive}, combatPage)
 
-    -- Page Visuals
-    local visualsPage = createPage("Visuals")
-    local visualsButton = createNavigationButton("Visuels", "👁️", 2)
-    visualsButton.MouseButton1Click:Connect(function() switchToPage(visualsPage) end)
-    Pages["Visuals"] = visualsPage
-    NavigationButtons["Visuals"] = visualsButton
+-- Page Visuals
+local visualsPage = createPage("Visuals")
+createTabButton("Visuals", visualsPage, 2)
+-- Toggle ESP
+createToggle("ESP", 10, {espActive}, visualsPage)
 
-    -- Page World
-    local worldPage = createPage("World")
-    local worldButton = createNavigationButton("Monde", "🌍", 3)
-    worldButton.MouseButton1Click:Connect(function() switchToPage(worldPage) end)
-    Pages["World"] = world
+-- Page Discord
+local discordPage = createPage("Discord")
+createTabButton("Discord", discordPage, 3)
+
+local DiscordButton = Instance.new("TextButton")
+DiscordButton.Parent = discordPage
+DiscordButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+DiscordButton.BorderSizePixel = 0
+DiscordButton.Position = UDim2.new(0, 10, 0, 10)
+DiscordButton.Size = UDim2.new(1, -20, 0, 40)
+DiscordButton.Font = Enum.Font.Gotham
+DiscordButton.Text = "Copier le lien Discord"
+DiscordButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+DiscordButton.TextSize = 16.000
+
+local DiscordCorner = Instance.new("UICorner")
+DiscordCorner.CornerRadius = UDim.new(0, 6)
+DiscordCorner.Parent = DiscordButton
+
+DiscordButton.MouseButton1Click:Connect(function()
+    setclipboard("https://discord.gg/votrediscord")
+    DiscordButton.Text = "Lien copié !"
+    wait(1)
+    DiscordButton.Text = "Copier le lien Discord"
+end)
+
+-- ===================================
+-- LOGIQUE DES FONCTIONS (Silent Aim & ESP)
+-- ===================================
+
+-- Nearest Head
+local function getNearestHead()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return nil end
+    local closest = nil
+    local shortest = math.huge
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local dist = (player.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if dist < shortest then
+                shortest = dist
+                closest = player
+            end
+        end
+    end
+    if closest and closest.Character and closest.Character:FindFirstChild("Head") then
+        return closest.Character.Head
+    end
+    return nil
+end
+
+-- Silent Aim
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and silentAimActive then
+        local target = getNearestHead()
+        if target then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+            -- Assurez-vous que le chemin du remote est correct pour Wild West
+            local event = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Attack")
+            if event then
+                event:FireServer(target)
+            end
+        end
+    end
+end)
+
+-- Setup ESP
+local function createESP(player)
+    if player == LocalPlayer then return end
+    local box = Drawing.new("Quad")
+    box.Thickness = 2
+    box.Color = Color3.fromRGB(0, 0, 255)
+    box.Transparency = 1
+    box.Visible = false
+    espList[player] = { drawing = box, connection = nil }
+    -- Clean up if player leaves
+    player.AncestryChanged:Connect(function()
+        if not player:IsDescendantOf(game) and espList[player] then
+            box:Remove()
+            espList[player] = nil
+        end
+    end)
+end
+
+-- Add ESP to all players
+for _, player in pairs(Players:GetPlayers()) do
+    createESP(player)
+end
+
+-- Player joins
+Players.PlayerAdded:Connect(function(player)
+    createESP(player)
+end)
+
+-- Player leaves
+Players.PlayerRemoving:Connect(function(player)
+    if espList[player] then
+        espList[player].drawing:Remove()
+        espList[player] = nil
+    end
+end)
+
+-- Main ESP Loop
+RunService.RenderStepped:Connect(function()
+    for player, data in pairs(espList) do
+        local box = data.drawing
+        if espActive and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Head") then
+            local root = player.Character.HumanoidRootPart
+            local head = player.Character.Head
+            local rootPos, onScreen1 = Camera:WorldToViewportPoint(root.Position)
+            local headPos, onScreen2 = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+            if onScreen1 and onScreen2 then
+                box.PointA = Vector2.new(rootPos.X - 15, rootPos.Y + 30)
+                box.PointB = Vector2.new(rootPos.X + 15, rootPos.Y + 30)
+                box.PointC = Vector2.new(headPos.X + 15, headPos.Y)
+                box.PointD = Vector2.new(headPos.X - 15, headPos.Y)
+                box.Visible = true
+            else
+                box.Visible = false
+            end
+        else
+            box.Visible = false
+        end
+    end
+end)
+
+-- ===================================
+-- CONTRÔLES DE L'INTERFACE
+-- ===================================
+-- Ouvrir/Fermer le menu
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.Insert then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end)
+
+-- Fermer avec le bouton X
+CloseButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+end)
+
+-- Afficher la première page au démarrage
+switchToPage(combatPage)
+
+print("Lixhub GUI loaded with Silent Aim and ESP.")
