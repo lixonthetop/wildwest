@@ -1,3 +1,7 @@
+-- ===================================
+-- PARTIE 1 : SERVICES ET VARIABLES INITIALES
+-- ===================================
+
 -- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -5,6 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
 
 -- Player
 local LocalPlayer = Players.LocalPlayer
@@ -14,15 +19,18 @@ local Camera = workspace.CurrentCamera
 local silentAimActive = false
 local espActive = false
 local espList = {}
+-- ===================================
+-- PARTIE 2 : CRÉATION DE L'INTERFACE GRAPHIQUE (GUI)
+-- ===================================
 
--- ===================================
--- INTERFACE GRAPHIQUE (GUI)
--- ===================================
+-- ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Lixhub"
-ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.Parent = CoreGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
+-- Protection contre la suppression par Roblox
+ScreenGui.ResetOnSpawn = false
 
 -- Main Frame
 local MainFrame = Instance.new("Frame")
@@ -83,7 +91,7 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 6)
 CloseCorner.Parent = CloseButton
 
--- Tab Buttons
+-- Tab Buttons Container
 local TabButtons = Instance.new("Frame")
 TabButtons.Name = "TabButtons"
 TabButtons.Parent = MainFrame
@@ -101,7 +109,7 @@ TabListLayout.Padding = UDim.new(0, 5)
 TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabListLayout.Parent = TabButtons
 
--- Pages
+-- Pages Container
 local Pages = Instance.new("Frame")
 Pages.Name = "Pages"
 Pages.Parent = MainFrame
@@ -113,6 +121,9 @@ Pages.Size = UDim2.new(1, -170, 1, -60)
 local PagesCorner = Instance.new("UICorner")
 PagesCorner.CornerRadius = UDim.new(0, 8)
 PagesCorner.Parent = Pages
+-- ===================================
+-- PARTIE 3 : FONCTIONS DE CRÉATION D'ÉLÉMENTS GUI
+-- ===================================
 
 -- Page Creation
 local function createPage(pageName)
@@ -128,6 +139,7 @@ local function createPage(pageName)
     pageLayout.Padding = UDim.new(0, 10)
     pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
     pageLayout.Parent = page
+
     pageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         page.CanvasSize = UDim2.new(0, 0, 0, pageLayout.AbsoluteContentSize.Y + 20)
     end)
@@ -153,6 +165,7 @@ local function createTabButton(text, page, layoutOrder)
     buttonCorner.Parent = button
 
     button.MouseButton1Click:Connect(function()
+        -- Hide all pages and reset button colors
         for _, p in pairs(Pages:GetChildren()) do
             if p:IsA("ScrollingFrame") then
                 p.Visible = false
@@ -164,6 +177,7 @@ local function createTabButton(text, page, layoutOrder)
                 b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
             end
         end
+        -- Show selected page and highlight button
         page.Visible = true
         button.TextColor3 = Color3.fromRGB(255, 85, 0)
         button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -190,7 +204,6 @@ local function createToggle(text, yPos, stateVariable, page)
     local ToggleLabel = Instance.new("TextLabel")
     ToggleLabel.Name = "ToggleLabel"
     ToggleLabel.Parent = ToggleFrame
-    ToggleLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     ToggleLabel.BackgroundTransparency = 1.000
     ToggleLabel.Position = UDim2.new(0, 40, 0, 0)
     ToggleLabel.Size = UDim2.new(1, -50, 1, 0)
@@ -209,8 +222,6 @@ local function createToggle(text, yPos, stateVariable, page)
     ToggleButton.Size = UDim2.new(0, 25, 0, 16)
     ToggleButton.Font = Enum.Font.SourceSans
     ToggleButton.Text = ""
-    ToggleButton.TextColor3 = Color3
-    -- ToggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
     ToggleButton.TextSize = 14.000
 
     local ButtonCorner = Instance.new("UICorner")
@@ -218,17 +229,22 @@ local function createToggle(text, yPos, stateVariable, page)
     ButtonCorner.Parent = ToggleButton
 
     -- Logic
-    local toggled = false
+    -- On initialise la variable de l'état du toggle à partir de la variable globale
+    local toggled = stateVariable[1]
+    ToggleButton.BackgroundColor3 = toggled and Color3.fromRGB(50, 255, 50) or Color3.fromRGB(255, 50, 50)
+
     ToggleButton.MouseButton1Click:Connect(function()
         toggled = not toggled
         stateVariable[1] = toggled -- Met à jour la variable globale
-        TweenService:Create(ToggleButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {BackgroundColor3 = toggled and Color3.fromRGB(50, 255, 50) or Color3.fromRGB(255, 50, 50)}):Play()
+        TweenService:Create(ToggleButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+            BackgroundColor3 = toggled and Color3.fromRGB(50, 255, 50) or Color3.fromRGB(255, 50, 50)
+        }):Play()
     end)
 end
+-- ===================================
+-- PARTIE 4 : CRÉATION DES PAGES ET DES FONCTIONNALITÉS
+-- ===================================
 
--- ===================================
--- CRÉATION DES PAGES ET DES BOUTONS
--- ===================================
 -- Page Combat
 local combatPage = createPage("Combat")
 createTabButton("Combat", combatPage, 1)
@@ -263,7 +279,7 @@ DiscordCorner.Parent = DiscordButton
 DiscordButton.MouseButton1Click:Connect(function()
     setclipboard("https://discord.gg/votrediscord")
     DiscordButton.Text = "Lien copié !"
-    wait(1)
+    task.wait(1)
     DiscordButton.Text = "Copier le lien Discord"
 end)
 
@@ -273,11 +289,13 @@ end)
 
 -- Nearest Head
 local function getNearestHead()
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return nil end
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return nil
+    end
     local closest = nil
     local shortest = math.huge
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
             local dist = (player.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
             if dist < shortest then
                 shortest = dist
@@ -292,16 +310,21 @@ local function getNearestHead()
 end
 
 -- Silent Aim
-UserInputService.InputBegan:Connect(function(input)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end -- Ne fait rien si le jeu gère déjà l'input (ex: chat)
     if input.UserInputType == Enum.UserInputType.MouseButton1 and silentAimActive then
         local target = getNearestHead()
         if target then
+            -- Change la caméra pour viser la tête
+            local originalCFrame = Camera.CFrame
             Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-            -- Assurez-vous que le chemin du remote est correct pour Wild West
+            -- Tire via le remote
             local event = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Attack")
             if event then
-                event:FireServer(target)
+                event:FireServer()
             end
+            -- Remet la caméra à sa place d'origine pour une transition fluide
+            Camera.CFrame = originalCFrame
         end
     end
 end)
@@ -309,16 +332,18 @@ end)
 -- Setup ESP
 local function createESP(player)
     if player == LocalPlayer then return end
-    local box = Drawing.new("Quad")
+    local box = Drawing.new("Square")
     box.Thickness = 2
-    box.Color = Color3.fromRGB(0, 0, 255)
+    box.Color = Color3.fromRGB(0, 255, 0)
     box.Transparency = 1
+    box.Filled = false
     box.Visible = false
-    espList[player] = { drawing = box, connection = nil }
+    espList[player] = { drawing = box }
+
     -- Clean up if player leaves
     player.AncestryChanged:Connect(function()
         if not player:IsDescendantOf(game) and espList[player] then
-            box:Remove()
+            espList[player].drawing:Remove()
             espList[player] = nil
         end
     end)
@@ -343,19 +368,19 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 -- Main ESP Loop
-RunService.RenderStepped:Connect(function()
+RunService.Heartbeat:Connect(function() -- Heartbeat est plus performant que RenderStepped pour des dessins
     for player, data in pairs(espList) do
         local box = data.drawing
-        if espActive and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Head") then
+        if espActive and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
             local root = player.Character.HumanoidRootPart
-            local head = player.Character.Head
-            local rootPos, onScreen1 = Camera:WorldToViewportPoint(root.Position)
-            local headPos, onScreen2 = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-            if onScreen1 and onScreen2 then
-                box.PointA = Vector2.new(rootPos.X - 15, rootPos.Y + 30)
-                box.PointB = Vector2.new(rootPos.X + 15, rootPos.Y + 30)
-                box.PointC = Vector2.new(headPos.X + 15, headPos.Y)
-                box.PointD = Vector2.new(headPos.X - 15, headPos.Y)
+            local rootPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            
+            if onScreen then
+                local distance = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                local size = 3000 / distance -- Ajuste la taille de la boîte en fonction de la distance
+                
+                box.Size = Vector2.new(size, size * 1.8) -- Largeur et Hauteur
+                box.Position = Vector2.new(rootPos.X - size / 2, rootPos.Y - size * 0.9)
                 box.Visible = true
             else
                 box.Visible = false
@@ -365,11 +390,11 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
+-- ===================================
+-- PARTIE 5 : CONTRÔLES DE L'INTERFACE ET INITIALISATION
+-- ===================================
 
--- ===================================
--- CONTRÔLES DE L'INTERFACE
--- ===================================
--- Ouvrir/Fermer le menu
+-- Ouvrir/Fermer le menu avec la touche Insert
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == Enum.KeyCode.Insert then
         MainFrame.Visible = not MainFrame.Visible
@@ -381,7 +406,13 @@ CloseButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
 end)
 
--- Afficher la première page au démarrage
-switchToPage(combatPage)
+-- Afficher la première page (Combat) au démarrage
+-- On simule un clic sur le premier bouton d'onglet pour que la logique de changement de page s'applique
+for _, button in pairs(TabButtons:GetChildren()) do
+    if button:IsA("TextButton") and button.LayoutOrder == 1 then
+        button.MouseButton1Click:Fire()
+        break
+    end
+end
 
 print("Lixhub GUI loaded with Silent Aim and ESP.")
